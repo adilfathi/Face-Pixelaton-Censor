@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect } from 'react'
 import * as faceapi from 'face-api.js'
-import './App.css'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import { Spinner } from '@/components/ui/spinner'
 
 function App() {
   const [image, setImage] = useState(null)
   const [detections, setDetections] = useState([])
-  const [pixelSize, setPixelSize] = useState(10)
+  const [pixelSize, setPixelSize] = useState([10])
   const [censorMethod, setCensorMethod] = useState('pixelation')
   const [processedImage, setProcessedImage] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [modelsLoaded, setModelsLoaded] = useState(false)
   
   const fileInputRef = useRef(null)
@@ -48,15 +53,18 @@ function App() {
         size: `${(file.size / 1024).toFixed(2)} KB`
       })
       
+      setIsUploading(true)
       const reader = new FileReader()
       reader.onload = (e) => {
         console.log('✅ [FILE UPLOAD] Image loaded successfully')
         setImage(e.target.result)
         setDetections([])
         setProcessedImage(null)
+        setIsUploading(false)
       }
       reader.onerror = () => {
         console.error('❌ [FILE UPLOAD] Error reading file')
+        setIsUploading(false)
       }
       reader.readAsDataURL(file)
     } else {
@@ -168,7 +176,8 @@ function App() {
     ctx.drawImage(img, 0, 0)
 
     // Apply pixelation to each detected face
-    console.log(`🎨 [PIXELATION] Applying pixelation to ${faceDetections.length} face(s) with pixel size: ${pixelSize}px`)
+    const currentPixelSize = pixelSize[0]
+    console.log(`🎨 [PIXELATION] Applying pixelation to ${faceDetections.length} face(s) with pixel size: ${currentPixelSize}px`)
     faceDetections.forEach((detection, index) => {
       // Handle different detection object structures
       const box = detection.detection?.box || detection.box
@@ -195,7 +204,7 @@ function App() {
       const faceImageData = ctx.getImageData(x, y, width, height)
       
       // Pixelate the face region
-      const pixelated = pixelateImageData(faceImageData, pixelSize)
+      const pixelated = pixelateImageData(faceImageData, currentPixelSize)
       
       // Put pixelated region back
       ctx.putImageData(pixelated, x, y)
@@ -261,7 +270,7 @@ function App() {
   // Re-apply pixelation when pixel size changes
   useEffect(() => {
     if (image && detections.length > 0) {
-      console.log(`🔄 [PIXELATION] Re-applying pixelation with new pixel size: ${pixelSize}px`)
+      console.log(`🔄 [PIXELATION] Re-applying pixelation with new pixel size: ${pixelSize[0]}px`)
       const img = new Image()
       img.src = image
       img.onload = () => {
@@ -286,57 +295,73 @@ function App() {
   }
 
   return (
-    <div className="app">
+    <div className="min-h-screen flex flex-col bg-background">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="nav-container">
-          <div className="nav-logo">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" fill="#1e3a8a"/>
+      <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="sm:w-8 sm:h-8">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" fill="hsl(var(--primary))"/>
             </svg>
-            <span className="nav-title">Face Censor | Privacy Tool</span>
+            <span className="text-sm sm:text-base lg:text-lg font-semibold text-foreground">Face Censor | Privacy Tool</span>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="main-content">
-        {!modelsLoaded && (
-          <div className="loading-banner">
-            <p>Loading face detection models...</p>
-          </div>
-        )}
-
-        <div className="content-container">
-          {/* Upload Card */}
-          <div className="card">
-            <div className="card-header">
-              <h2>Upload Image</h2>
-              <p className="card-subtitle">Select an image to process</p>
+      <main className="flex-1 py-4 sm:py-6 lg:py-8 bg-muted/30 flex items-center justify-center">
+        <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {!modelsLoaded && (
+            <div className="mb-4 sm:mb-6">
+              <div className="flex items-center justify-center gap-2 p-3 sm:p-4 bg-muted rounded-md">
+                <Spinner size="sm" className="text-primary" />
+                <p className="text-xs sm:text-sm text-muted-foreground">Loading face detection models...</p>
+              </div>
             </div>
-            <div className="card-body">
+          )}
+
+          <div className="space-y-4 sm:space-y-6">
+          {/* Upload Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Upload Image</CardTitle>
+              <CardDescription>Select an image to process</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div
                 ref={dropZoneRef}
-                className="upload-area"
+                className="relative border-2 border-dashed rounded-lg p-6 sm:p-8 lg:p-12 text-center cursor-pointer transition-colors hover:border-primary/50 bg-muted/30 min-h-[200px] sm:min-h-[240px] lg:min-h-[280px] flex items-center justify-center"
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onClick={() => fileInputRef.current?.click()}
               >
-                {image ? (
-                  <div className="image-preview-container">
-                    <img ref={imageRef} src={image} alt="Uploaded" className="preview-image" />
+                {isUploading ? (
+                  <div className="flex flex-col items-center justify-center gap-4">
+                    <Spinner size="lg" className="text-primary" />
+                    <p className="text-sm text-muted-foreground">Uploading image...</p>
+                  </div>
+                ) : image ? (
+                  <div className="flex justify-center w-full">
+                    <img ref={imageRef} src={image} alt="Uploaded" className="max-w-full h-auto max-h-[300px] sm:max-h-[400px] lg:max-h-[500px] rounded-md shadow-md object-contain" />
                   </div>
                 ) : (
-                  <div className="upload-placeholder">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M19 7v2.99s-1.99.01-2 0V7c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-2.99s2 .01 2 0V17c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2h-4z" fill="#6b7280"/>
-                      <path d="M19 5h2v2h-2V5zm-2 0h-2v2h2V5zm2 0h2v2h-2V5z" fill="#6b7280"/>
+                  <div className="flex flex-col items-center gap-3 sm:gap-4 w-full">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-muted-foreground sm:w-12 sm:h-12">
+                      <path d="M19 7v2.99s-1.99.01-2 0V7c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2v-2.99s2 .01 2 0V17c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2h-4z" fill="currentColor"/>
+                      <path d="M19 5h2v2h-2V5zm-2 0h-2v2h2V5zm2 0h2v2h-2V5z" fill="currentColor"/>
                     </svg>
-                    <p className="upload-text-primary">Drag and drop your image here</p>
-                    <p className="upload-text-secondary">or click to browse</p>
-                    <button className="upload-button" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                    <div className="text-center">
+                      <p className="text-sm sm:text-base font-medium text-foreground mb-1">Drag and drop your image here</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">or click to browse</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="sm:size-default"
+                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                    >
                       Choose File
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -344,101 +369,115 @@ function App() {
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
-                style={{ display: 'none' }}
+                className="hidden"
                 onChange={(e) => handleFileSelect(e.target.files[0])}
               />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Control Panel Card */}
           {image && (
-            <div className="card">
-              <div className="card-header">
-                <h2>Control Panel</h2>
-                <p className="card-subtitle">Configure censor settings</p>
-              </div>
-              <div className="card-body">
-                <div className="control-group">
-                  <label htmlFor="censor-method" className="control-label">
+            <Card>
+              <CardHeader>
+                <CardTitle>Control Panel</CardTitle>
+                <CardDescription>Configure censor settings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 sm:space-y-6">
+                <div className="space-y-2">
+                  <label htmlFor="censor-method" className="text-sm font-medium">
                     Censor Method
                   </label>
-                  <select
-                    id="censor-method"
-                    value={censorMethod}
-                    onChange={(e) => setCensorMethod(e.target.value)}
-                    className="control-select"
-                  >
-                    <option value="pixelation">Pixelation</option>
-                  </select>
+                  <Select value={censorMethod} onValueChange={setCensorMethod}>
+                    <SelectTrigger id="censor-method" className="w-full">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pixelation">Pixelation</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
-                <div className="control-group">
-                  <label htmlFor="intensity" className="control-label">
-                    Intensity: {pixelSize}px
-                  </label>
-                  <input
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="intensity" className="text-sm font-medium">
+                      Intensity
+                    </label>
+                    <span className="text-xs sm:text-sm text-muted-foreground">{pixelSize[0]}px</span>
+                  </div>
+                  <Slider
                     id="intensity"
-                    type="range"
-                    min="5"
-                    max="30"
+                    min={5}
+                    max={30}
+                    step={1}
                     value={pixelSize}
-                    onChange={(e) => setPixelSize(Number(e.target.value))}
-                    className="control-slider"
+                    onValueChange={setPixelSize}
                     disabled={detections.length === 0}
+                    className="w-full"
                   />
-                  <div className="slider-labels">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Low</span>
                     <span>High</span>
                   </div>
                 </div>
 
-                <button
+                <Button
                   onClick={detectFaces}
                   disabled={!modelsLoaded || isProcessing}
-                  className="apply-button"
+                  className="w-full"
+                  size="default"
                 >
-                  {isProcessing ? 'Processing...' : 'Apply Censor'}
-                </button>
+                  {isProcessing ? (
+                    <>
+                      <Spinner size="sm" className="mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    'Apply Censor'
+                  )}
+                </Button>
 
                 {detections.length > 0 && (
-                  <div className="detection-status">
-                    <p className="status-text">
+                  <div className="p-3 sm:p-4 bg-primary/10 border border-primary/20 rounded-md text-center">
+                    <p className="text-xs sm:text-sm font-medium text-primary">
                       {detections.length} face{detections.length !== 1 ? 's' : ''} detected
                     </p>
                   </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Result Card */}
           {processedImage && (
-            <div className="card">
-              <div className="card-header">
-                <h2>Processed Image</h2>
-                <p className="card-subtitle">Preview and download your censored image</p>
-              </div>
-              <div className="card-body">
-                <div className="result-preview">
-                  <img src={processedImage} alt="Processed" className="result-image" />
+            <Card>
+              <CardHeader>
+                <CardTitle>Processed Image</CardTitle>
+                <CardDescription>Preview and download your censored image</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-center w-full">
+                  <img src={processedImage} alt="Processed" className="max-w-full h-auto max-h-[300px] sm:max-h-[400px] lg:max-h-[500px] rounded-md shadow-md border object-contain" />
                 </div>
-                <button onClick={downloadImage} className="download-button">
+                <Button onClick={downloadImage} className="w-full" size="default">
                   Download Image
-                </button>
-              </div>
-            </div>
+                </Button>
+              </CardContent>
+            </Card>
           )}
+          </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="footer">
-        <div className="footer-container">
-          <p>&copy; {new Date().getFullYear()} Face Censor. All rights reserved.</p>
+      <footer className="border-t bg-background">
+        <div className="container mx-auto flex h-14 sm:h-16 items-center justify-center px-4 sm:px-6 lg:px-8">
+          <p className="text-xs sm:text-sm text-muted-foreground text-center">
+            &copy; {new Date().getFullYear()} Face Censor. All rights reserved.
+          </p>
         </div>
       </footer>
 
-      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   )
 }
